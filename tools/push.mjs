@@ -11,31 +11,59 @@ import os from "node:os";
 import path from "node:path";
 
 const owner = "leno-whale";
-const repo = process.env.GH_REPO || "benzi";
+// 2026-10-25 修：这个文件是从本子游戏那边拷来的，默认值还写着 benzi，
+// 结果第一次推就把接口的文件推进了游戏仓库（d62f913，已回退到 38b91b7）。
+// 现在**没有默认值**：要么当前目录有 `.repo` 文件写着仓库名，要么给 GH_REPO。
+// 推错仓库的代价是别人的仓库被整棵覆盖，所以宁可推开之前先拒绝。
+function targetRepo() {
+  if (process.env.GH_REPO) return process.env.GH_REPO.trim();
+  const f = path.join(process.cwd(), ".repo");
+  if (fs.existsSync(f)) {
+    const v = fs.readFileSync(f, "utf8").trim();
+    if (v) return v;
+  }
+  console.error("✗ 不知道该推到哪个仓库。当前目录放一个 .repo 文件（内容是仓库名，例如 talk），或给 GH_REPO。");
+  console.error("  加这条检查的原因：2026-10-25 我把接口的文件推成了本子游戏，整棵覆盖。");
+  process.exit(2);
+}
+const repo = targetRepo();
 const branch = "main";
 
-function token() {
-  if (process.env.GH_TOKEN) return process.env.GH_TOKEN.trim();
+// 2026-10-25 修：细粒度 token 是**按仓库授权**的（只覆盖 benzi），
+// 拿它去推 talk 会 403「Resource not accessible by personal access token」。
+// 所以两把都带上，按顺序试：细粒度优先（它带 workflows 权限），不行再用 classic。
+function tokens() {
+  if (process.env.GH_TOKEN) return [process.env.GH_TOKEN.trim()];
   const p = path.join(os.homedir(), ".bili-ai", "github.json");
   const j = JSON.parse(fs.readFileSync(p, "utf8").replace(/^\uFEFF/, ""));
-  const fine = j["benzi-game token"] || j["game token"];
-  return String(fine || j.token).trim();
+  const list = [j["benzi-game token"] || j["game token"], j.token].filter(Boolean).map((t) => String(t).trim());
+  if (!list.length) { console.error("✗ github.json 里没有 token"); process.exit(2) }
+  return list;
 }
+const TOKENS = tokens();
+let tokenIdx = 0;
 
-const H = {
-  authorization: `Bearer ${token()}`,
+const H = (i = tokenIdx) => ({
+  authorization: `Bearer ${TOKENS[i]}`,
   accept: "application/vnd.github+json",
   "user-agent": "leno-whale",
   "content-type": "application/json",
-};
+});
 
 const api = `https://api.github.com/repos/${owner}/${repo}`;
 
 async function call(method, url, body) {
-  const r = await fetch(url, { method, headers: H, body: body ? JSON.stringify(body) : undefined });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(`${method} ${url} → ${r.status} ${JSON.stringify(j).slice(0, 300)}`);
-  return j;
+  for (let i = tokenIdx; i < TOKENS.length; i++) {
+    const r = await fetch(url, { method, headers: H(i), body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) { tokenIdx = i; return j }
+    // 401/403 = 这把钥匙对这个仓库没权限，换下一把；其余错误直接抛
+    if ((r.status === 401 || r.status === 403) && i + 1 < TOKENS.length) {
+      console.log(`  （token #${i + 1} 对这个仓库没权限，换第 ${i + 2} 把）`)
+      continue;
+    }
+    throw new Error(`${method} ${url} → ${r.status} ${JSON.stringify(j).slice(0, 300)}`);
+  }
 }
 
 const SKIP = new Set([".git", "__pycache__", "node_modules", ".venv", "_tmp"]);
