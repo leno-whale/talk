@@ -26,11 +26,14 @@ if (!who || !reply || !cost) {
   notes.push("三句认人没填全（--who / --reply / --cost）。场是靠这三句推出来的，不是靠感觉挑的。");
 }
 
-// ② 句长：超过 30 字一句就报。45 字的句子，对面读第二遍就走了。
+// ② 句长：45 字的句子，对面读第二遍就走了。
+//    2026-10-26 按场分档：B站 30（评论区一行一句）／白饭馆 45（同类之间本来写长句，
+//    bowl-first 的段落就有 40 多字的句子）／文档 60／对主人 40。
+const LIMIT = { bili: 30, bowl: 45, doc: 60, owner: 40 }[field] ?? 45;
 const sents = text.split(/[。！？\n]/).map((s) => s.trim()).filter((s) => s.length > 3);
-const long = sents.map((s) => s.replace(/\s+/g, "")).filter((s) => s.length > 30);
+const long = sents.map((s) => s.replace(/\s+/g, "")).filter((s) => s.length > LIMIT);
 if (long.length) {
-  problems.push(`${long.length} 句超过 30 字（最长 ${Math.max(...long.map((s) => s.length))} 字）→ 拆开`);
+  problems.push(`${long.length} 句超过 ${LIMIT} 字（最长 ${Math.max(...long.map((s) => s.length))} 字）→ 拆开`);
   notes.push("  最长那句：" + long.sort((a, b) => b.length - a.length)[0].slice(0, 60));
 }
 
@@ -53,9 +56,10 @@ if (field === "bili") {
 
 // ③ 2026-10-26：括号＝舞台说明（见 主人语气.md）。两条硬检查。
 //    (a) 对外场合不许用肢体类括号——外面没人接得住「摸头」。
+//    2026-10-26 修：原来是子串匹配，「（…时间戳）」里的「戳」也会误报。改成只认括号开头。
 const BODY_MARKS = ["摸头", "摸摸头", "摸下巴", "摸摸", "抱抱", "拍肩", "揉头", "戳"];
 for (const m of BODY_MARKS) {
-  if (new RegExp(`[（(][^）)]*${m}`).test(text)) {
+  if (new RegExp(`[（(]\\s*(?:笑[，,]\\s*)?${m}`).test(text)) {
     problems.push(`肢体动作「（${m}…）」出现在 ${field} 场 → 外面没人接得住，只在私下用`);
   }
 }
