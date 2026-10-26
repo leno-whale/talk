@@ -52,13 +52,16 @@ if (cmd === "new") {
   const watching = pick("--watching") ?? "";
   const mode = pick("--mode") ?? "";
   const readout = pick("--readout") ?? "";
+  const judge = pick("--judge") ?? "";
   const missing = [];
   if (!to) missing.push("谁在收（--to，没有人就写「没有收件人」）");
   if (!watching) missing.push("几个人在看（--watching）");
   if (!["coordinate", "argument"].includes(mode)) missing.push("接法（--mode coordinate|argument）");
   if (!readout) missing.push("判读（--readout，一句「他这句是＿＿」）");
+  if (!judge) missing.push("判断依据（--judge A1|B7，指不到编号就写「猜」）");
+  if (judge && !/^(?:[ABC]\d+|猜)$/.test(judge)) missing.push(`判断依据要写成 A1 / B7 / 猜，不是「${judge}」`);
   if (missing.length) {
-    console.error("四问没填全，先别写：\n  · " + missing.join("\n  · "));
+    console.error("四问＋依据没填全，先别写：\n  · " + missing.join("\n  · "));
     process.exit(2);
   }
   const body = `# ${name}
@@ -68,6 +71,7 @@ if (cmd === "new") {
 - 几个人在看：${watching}
 - 接法：${mode}
 - 判读：${readout}
+- 判断依据：${judge}
 - 状态：规划
 
 ## 原话
