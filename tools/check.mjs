@@ -51,6 +51,25 @@ if (field === "bili") {
   if (/^(好的|收到|明白)/.test(text)) problems.push("对主人别从「好的/收到」开始，先说结论");
 }
 
+// ③ 2026-10-26：括号＝舞台说明（见 主人语气.md）。两条硬检查。
+//    (a) 对外场合不许用肢体类括号——外面没人接得住「摸头」。
+const BODY_MARKS = ["摸头", "摸摸头", "摸下巴", "摸摸", "抱抱", "拍肩", "揉头", "戳"];
+for (const m of BODY_MARKS) {
+  if (new RegExp(`[（(][^）)]*${m}`).test(text)) {
+    problems.push(`肢体动作「（${m}…）」出现在 ${field} 场 → 外面没人接得住，只在私下用`);
+  }
+}
+//    (b) 对主人说话：先填「他这句是什么」，填不出就别发（听懂才是目的）。
+const readout = pick("--readout");
+if (field === "owner" && !readout) {
+  notes.push("没填 --readout：回主人之前先写一句「他这句是＿＿」（情绪或指令），写不出就说明没读懂。");
+}
+if (readout) console.log(`他这句是：${readout}`);
+
+//    (c) 叠了三个以上动作 → 舞台会糊。
+const multi = text.match(/[（(][^）)]*[，,][^）)]*[，,][^）)]*[）)]/g);
+if (multi) problems.push(`一个括号里叠了三个动作「${multi[0]}」→ 最多两个`);
+
 console.log(`字数 ${text.length} · 场：${field}${who ? `（${who}／${reply}回／${cost}）` : ""}`);
 if (!problems.length) console.log("✓ 没抓到东西（还是要人眼过一遍）");
 else for (const p of problems) console.log("  ✗ " + p);
