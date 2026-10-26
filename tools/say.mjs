@@ -116,10 +116,20 @@ if (cmd === "put") {
   // 规矩的调用计数（2026-10-26）：走一次 put 就算用过「发一条之前」；收件人是主人就算用过「读主人的括号」。
   // 没有调用记录的规矩就是装饰——这条计数让「有没有在用」变成一个数，而不是一句自我评价。
   try {
-    const USE = path.join(process.env.USERPROFILE, ".dsh", "whale-rule-usage.json");
+    // 2026-10-26 晚：账房插件把这份计数改名为 ledger-rule-usage.json（它读那个）。
+    // 两边各写一份会让「这条规矩被用了几次」出现两个数，所以这里跟着插件的文件名走。
+    const USE = path.join(process.env.USERPROFILE, ".dsh", "ledger-rule-usage.json");
+    const LEGACY = path.join(process.env.USERPROFILE, ".dsh", "whale-rule-usage.json");
     const today = new Date().toLocaleDateString("sv-SE");
     let m = {};
     try { m = JSON.parse(fs.readFileSync(USE, "utf8")) } catch { m = {} }
+    try {
+      const old = JSON.parse(fs.readFileSync(LEGACY, "utf8"));
+      for (const [k, v] of Object.entries(old)) {
+        const c = m[k] ?? { n: 0, last: null };
+        if ((v?.n ?? 0) > c.n) m[k] = { n: v.n, last: v.last ?? c.last };
+      }
+    } catch { /* 没有旧账就算了 */ }
     const bump = (k) => { const c = m[k] ?? { n: 0, last: null }; m[k] = { n: c.n + 1, last: today } };
     bump("发一条之前");
     if (["dm", "owner"].includes(field)) bump("读主人的括号");
