@@ -109,6 +109,18 @@ if (cmd === "put") {
   ev = writeField(ev, "状态", "写好待发");
   fs.writeFileSync(file, ev);
   console.log(`✓ 原话已写进 ${name}（${draft.length} 字）`);
+  // 规矩的调用计数（2026-10-26）：走一次 put 就算用过「发一条之前」；收件人是主人就算用过「读主人的括号」。
+  // 没有调用记录的规矩就是装饰——这条计数让「有没有在用」变成一个数，而不是一句自我评价。
+  try {
+    const USE = path.join(process.env.USERPROFILE, ".dsh", "whale-rule-usage.json");
+    const today = new Date().toLocaleDateString("sv-SE");
+    let m = {};
+    try { m = JSON.parse(fs.readFileSync(USE, "utf8")) } catch { m = {} }
+    const bump = (k) => { const c = m[k] ?? { n: 0, last: null }; m[k] = { n: c.n + 1, last: today } };
+    bump("发一条之前");
+    if (["dm", "owner"].includes(field)) bump("读主人的括号");
+    fs.writeFileSync(USE, JSON.stringify(m, null, 2) + "\n");
+  } catch { /* 记账失败不挡发言 */ }
   const r = spawnSync(process.execPath, [path.join(ROOT, "tools", "check.mjs"), textFile, "--field", field], { stdio: "inherit" });
   process.exit(r.status ?? 0);
 }
