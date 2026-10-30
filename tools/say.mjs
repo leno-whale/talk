@@ -23,6 +23,13 @@ const today = () => {
 
 const files = () => fs.readdirSync(DIR).filter((f) => f.endsWith(".md") && f !== "README.md").sort();
 
+// 本地时刻 YYYY-MM-DD HH:MM（与 L1 / 日记同一把钟；不要用 toISOString，那个是 UTC）
+const localStamp = () => {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `${today()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
 function nextName() {
   const d = today();
   const n = files().filter((f) => f.startsWith(d)).length + 1;
@@ -46,6 +53,13 @@ function section(text, title, body) {
 }
 
 if (cmd === "new") {
+  // @hook:judge-new 技能钩子（B-2，2026-10-28）
+  try {
+    const { execFileSync } = await import('node:child_process')
+    const out = execFileSync(process.execPath, ['F:\\agent expore\\自我\\tools\\skills-hook.mjs', 'judge', '白饭馆'], { encoding: 'utf8' })
+    console.log(out.trimEnd())
+  } catch (e) { console.log('（技能钩子没跑起来：' + (e && e.message) + '）') }
+
   const name = nextName();
   const field = pick("--field") ?? "post";
   const to = pick("--to") ?? "";
@@ -85,6 +99,13 @@ if (cmd === "new") {
 ## 结算
 
 （待定）
+
+## 三时刻
+
+- 原计划落笔：${localStamp()}
+- 预期兑现：（未定／日期／永不）
+- 实际兑现：（未发生）
+- 被拦：0 次 / 拆句：0 处 / 字数差：0 字
 `;
   const file = path.join(DIR, `${name}.md`);
   fs.writeFileSync(file, body);
@@ -94,6 +115,13 @@ if (cmd === "new") {
 }
 
 if (cmd === "put") {
+  // @hook:say-put 技能钩子（B-2，2026-10-28）
+  try {
+    const { execFileSync } = await import('node:child_process')
+    const out = execFileSync(process.execPath, ['F:\\agent expore\\自我\\tools\\skills-hook.mjs', 'say', '白饭馆'], { encoding: 'utf8' })
+    console.log(out.trimEnd())
+  } catch (e) { console.log('（技能钩子没跑起来：' + (e && e.message) + '）') }
+
   const name = args[1];
   const textFile = pick("--text");
   if (!name || !textFile) {
@@ -156,6 +184,11 @@ if (cmd === "got") {
   ev = section(ev, "回执", reply);
   ev = section(ev, "结算", verdict);
   ev = writeField(ev, "状态", "已结算");
+  // 三时刻：结算时把「实际兑现」写成日期（P3 的 t_pay 来源）
+  if (!/^## 三时刻/m.test(ev)) {
+    ev = ev.trimEnd() + `\n\n## 三时刻\n\n- 原计划落笔：（未记）\n- 预期兑现：（未定／日期／永不）\n- 实际兑现：（未发生）\n- 被拦：0 次 / 拆句：0 处 / 字数差：0 字\n`;
+  }
+  ev = ev.replace(/- 实际兑现：（未发生）/, `- 实际兑现：${localStamp()}`);
   fs.writeFileSync(file, ev);
   console.log(`✓ ${name} 回执已记：${verdict}`);
   process.exit(0);

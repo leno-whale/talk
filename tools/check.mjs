@@ -5,6 +5,13 @@ import fs from "node:fs";
 
 const args = process.argv.slice(2);
 const pick = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : undefined);
+
+  // @hook:check-entry 技能钩子（B-2，2026-10-28）
+  try {
+    const { execFileSync } = await import('node:child_process')
+    const out = execFileSync(process.execPath, ['F:\\agent expore\\自我\\tools\\skills-hook.mjs', 'check', '白饭馆'], { encoding: 'utf8' })
+    console.log(out.trimEnd())
+  } catch (e) { console.log('（技能钩子没跑起来：' + (e && e.message) + '）') }
 const file = args[0];
 if (!file || file.startsWith("--")) {
   console.error("用法: node tools/check.mjs <草稿文件> [--field bili|bowl|doc|owner]");
